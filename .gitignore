@@ -1,0 +1,8 @@
+*#
+*~
+
+*.csv
+
+notes/
+
+.ipynb_checkpoints/
