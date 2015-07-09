@@ -1,9 +1,19 @@
 import requests
 import time
 import re
+import pickle
 from bs4 import BeautifulSoup
 
-url = "http://www.boxofficemojo.com/genres/chart/?id=foreign.htm"
+######
+# Notes:
+# get movie names and links from first 15 pages 
+# of boxofficemojo Foreign Language section
+#
+# URLS
+#"http://www.boxofficemojo.com/genres/chart/?id=foreign.htm"
+#"http://www.boxofficemojo.com/genres/chart/?view=main&sort=
+#        gross&order=DESC&pagenum=15&id=foreign.htm"
+######
 
 def connect(url):
     response = requests.get(url)
@@ -11,54 +21,61 @@ def connect(url):
     page = response.text
     return response, code, page
 
-response, code, page = connect(url)
+def connection_process(url):
+    response, code, page = connect(url)
+    while code != 200:
+        response, code, page =  connect(url)
+        time.sleep(1)
+    return page
 
-while code != 200:
-   response, code, page =  connect(url)
-   time.sleep(1)
+def pickle_stuff(filename, data):
+    with open(filename, 'w') as pickelfile:
+        pickle.dump(data, pickelfile)
 
-soup = BeautifulSoup(page)
+def unpickel(filename):
+    with open(filename, 'r') as pickelfile:
+        old_data = pickel.load(pickelfile)
+    return old_data
 
+def parse_foreignlanguage_table(tables):
+    linklist = []
+    for table in tables:
+        rows = table.findAll('tr')
+        for tr in rows:
+            cols = tr.findAll('td')
+            for col in cols:
+                links = col.findAll('a', href=re.compile("movies"))
+                if len(links) > 0:
+                    linklist.append(links)
+        if len(linklist) > 0:
+            return linklist
 
-tables = soup.find_all('table')#href="/movies/')
-linklist = []
+def get_foreign_titles():
+    PAGENUM = 15
+    fullkeys = []
+    PICKLEDIR = "./pkls/"
+    
+    for i in range(PAGENUM):
+        page_n = i+1
+        url = "http://www.boxofficemojo.com/genres/chart/?view=main&sort=gross&order=DESC&pagenum=%d&id=foreign.htm" %page_n
+        
+        page = connection_process(url)
+        soup = BeautifulSoup(page)
+        tables = soup.find_all('table')
+        
+        linklist = parse_foreignlanguage_table(tables)
+        links = linklist[0]
+        keys = []
+        for link in links:
+            address = link['href']
+            title = link.text
+            keys.append((title, address))
+            fullkeys.append((title, address))
+            
+        pickle_stuff(PICKLEDIR + "keys_%d.pkl" %page_n, keys)
+    pickle_stuff(PICKLEDIR + "fullkeys.pkl", fullkeys)
 
-for table in tables:
-    rows = table.findAll('tr')
-    for tr in rows:
-        cols = tr.findAll('td')
-        for col in cols:
-            links = col.findAll('a', href=re.compile("movies"))
-            if len(links) > 0:
-                linklist.append(links)
-    if len(linklist) > 0:
-        break
+    return fullkeys
 
-links = linklist[0]
-#print tables[3].prettify()
-#for index, item in enumerate(table):
-#    if item.fetchNextSiblings('a') == []:
-#        #print index, item
-#        #item.decompose()
+print get_foreign_titles()
 
-
-#for index, item in enumerate(table):
-#    if item is not None:
-#        print index, item, type(item)
-#        linklist.append(item.find_all('a'))
-
-#print soup.find_all('a', href=re.compile("movies"))
-
-
-#something = soup.h1.find_next_siblings('table').a
-
-#find_all('a', href=re.compile("movies"))
-
-#print something
-#for t in table:
-#    print t
-#    tsoup = BeautifulSoup(t)
-#    #linklist.append(soup.find_all('a', href=re.compile("movies")))
-
-print links
-#print code
