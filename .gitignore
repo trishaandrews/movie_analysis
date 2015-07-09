@@ -4,5 +4,6 @@
 *.csv
 
 notes/
+pkls/
 
 .ipynb_checkpoints/
