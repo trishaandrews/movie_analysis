@@ -168,12 +168,10 @@ def parse_messy_data(messy_data, soup):
         notuni = deunicode(messy_data[m]).strip()
         if notuni == "Release Dates:":
             valuemaybe = deunicode(messy_data[m+1])
-            limdate = " ".join(valuemaybe.replace(",","").split()[:3])
-            widedate = " ".join(valuemaybe.replace(",","").split()[4:7])
+            limdate = " ".join(valuemaybe.split()[:3])
+            widedate = " ".join(valuemaybe.split()[4:7])
         elif notuni == "Opening Weekend:":
-            widedate = get_movie_value(soup, "Release Date").replace(",","")
-            #if widedate is not None:
-            #    widedate = deunicode(widedate)
+            widedate = get_movie_value(soup, "Release Date")
         if notuni == "Opening Weekend:" or notuni == "Wide Opening Weekend:":
             theatersli = deunicode(messy_data[m+2]).replace(",","").split()
             widetheaters = get_theater(theatersli)
@@ -184,14 +182,14 @@ def parse_messy_data(messy_data, soup):
             theatersli = deunicode(messy_data[m+1]).replace(",","").split()
             alltheaters = get_theater(theatersli)
         if widedate is None:
-            widedate = get_movie_value(soup, "Release Date").replace(",","")
+            widedate = get_movie_value(soup, "Release Date")
     data = (limdate, limtheaters, widedate, widetheaters, alltheaters)
     return data
 
 def get_nice_data(soup):
-    budget = get_movie_value(soup, "Production Budget").replace("$","")
+    budget = get_movie_value(soup, "Production Budget")
     main_genre = get_movie_value(soup, "Genre:")
-    domestic = get_movie_value(soup, "Domestic Total").replace("$","")
+    domestic = get_movie_value(soup, "Domestic Total")
     return budget, main_genre, domestic
 
 def get_bomojo_values(fullkeys, fulllocs):
@@ -208,11 +206,11 @@ def get_bomojo_values(fullkeys, fulllocs):
             if domestic is not None:
                 domestic = deunicode(soup.find(text="Domestic:")
                                      .find_parent("td").find_next_sibling("td")
-                                     .get_text(strip=True)).replace("$","")
+                                     .get_text(strip=True))
         foreign = soup.find(text="Foreign:")
         if foreign is not None:
             foreign = deunicode(soup.find(text="Foreign:").find_parent("td")
-                                .find_next_sibling("td").get_text(strip=True)).replace("$","")
+                                .find_next_sibling("td").get_text(strip=True))
         messy_data =  get_domestic_summary(soup)
         parsed_data = parse_messy_data(messy_data, soup)
         academy_str = soup.find(text=re.compile("Academy"))
@@ -223,10 +221,12 @@ def get_bomojo_values(fullkeys, fulllocs):
         genre_result = soup.find_all(href=re.compile("genres/chart"))
         for genre in genre_result:
             genres.append(deunicode(genre.text))
+            genres = set(genres)
         movies[key] = [fulllocs[key], budget, domestic, foreign, 
                        parsed_data[0], parsed_data[1], parsed_data[2], 
                        parsed_data[3], parsed_data[4], genres, academy]
     pickle_stuff(PICKLEDIR + "movies.pkl", movies)
+    return movies
 
 def get_omdb_countries(movies):
     count = 0
@@ -253,102 +253,106 @@ def get_omdb_countries(movies):
         if count >= 10:
             break
     pickle_stuff(PICKLEDIR + "moviesfilled.pkl", movies)
+    return movies
 
-def make_na_none(movies):
-    for key in movies:
-        vals = movies[key]
-        for v in range(len(vals)):
-            if vals[v] == "N/A" or vals[v] == "n/a" or vals[v] == "na":
-                vals[v] = None
-        movies[key] = vals
-    pickle_stuff(PICKLEDIR + "moviesnone.pkl", movies)
+def clean_and_make_none(vals):
+    #for key in movies:
+    #    vals = movies[key]
+    newvals = []
+    for v in range(len(vals)):
+        item = vals[v]
+        if item == "N/A" or item == "n/a" or item == "na":
+            item = None
+        if item is not None and type(item) == str:
+            if "," in item:
+                item = item.replace(",","")
+            if "$" in item:
+                item = item.replace("$","")
+            if "million" in item:
+                vallist = item.split()
+                item = float(vallist[0])*(10**6)
+        newvals.append(item)
+    return newvals
 
-def separate_genres(movies):
+def separate_genres(vals):
     #(OriginC, Budget, DomLifeGross, ForLifeGross, LtdRelDate, LtdOpenTh,
     #          WRelDate, WOpenTh, WidestTh, Genre1, Genre2, Genre3,
     #          Genre4, Awards?)
-    new_movies = {}
+    front_vals = vals[:9]
+    genre_list = vals[9]
+    awards = vals[10]
+    g_lim = len(genre_list)
+    genre1 = None 
+    genre2 = None
+    genre3 = None
+    genre4 = None
+    if g_lim >= 1:
+        genre1 = genre_list[0]
+    if g_lim >= 2:
+        genre2 = genre_list[1]
+    if g_lim >= 3:
+        genre3 = genre_list[2]
+    if g_lim >= 4:
+        genre4 = genre_list[3]
+    new_vals = front_vals + [genre1, genre2, genre3, genre4] + [awards]
+    return new_vals
+        
+def compare_genres(movies):
+    keylist = movies.keys()
+    for key in range(len(keylist)):
+        vals = movies[keylist[key]]
+        for k in range(len(keylist)):
+            vals2 = movies[keylist[k]]
+            if key != k:
+                for v1 in range(4):
+                    genre1 = vals[9+v1]
+                    for v2 in range(v1+1, 4):
+                        if v1 != v2:
+                            genre2 = vals2[9+v2]
+                            if genre1 == genre2:
+                                temp = genre2
+                                vals2[9+v2] = vals2[9+v1]
+                                vals2[9+v1] = temp
+                                #movies[k] = vals2
+            
+    return movies
+                            
+                    
+                        
+            
+def clean_data(movies):
     for key in movies:
         vals = movies[key]
-        front_vals = vals[:9]
-        genre_list = vals[9]
-        awards = vals[10]
-        g_lim = len(genre_list)
-        genre1 = None 
-        genre2 = None
-        genre3 = None
-        genre4 = None
-        if g_lim >= 1:
-            genre1 = genre_list[0]
-        if g_lim >= 2:
-            genre2 = genre_list[1]
-        if g_lim >= 3:
-            genre3 = genre_list[2]
-        if g_lim >= 4:
-            genre4 = genre_list[3]
-        new_vals = front_vals + [genre1, genre2, genre3, genre4] + [awards]
-        new_movies[key] = new_vals
-    pickle_stuff(PICKLEDIR + "moviesgenre.pkl", new_movies)
+        #vals = separate_genres(vals)
+        vals = clean_and_make_none(vals)
+        #print vals
+        movies[key] = vals
+    #movies = compare_genres(movies)
+    pickle_stuff(PICKLEDIR + "cleanmovies.pkl", movies)
+    return movies
         
-def make_dict_of_dicts(movies):
-    movie_dicts = {}
-    categ = ["OriginC", "Budget", "DomLifeGross", "ForLifeGross",
-                  "LtdRelDate", "LtdOpenTh", "WRelDate", "WOpenTh", "WidestTh",
-                  "Genre1", "Genre2", "Genre3", "Genre4", "Awards"]
-    #(OriginC, Budget, DomLifeGross, ForLifeGross, LtdRelDate, LtdOpenTh,
-    #              WRelDate, WOpenTh, WidestTh, (Genre), Awards?)
-    for key in movies:
-        vals = movies[key]
-        for v in range(len(vals)):
-            if v == 9:
-                g_lim = len(vals[v])
-                for g in range(4):
-                    pass
-            else:
-                new_dict = {categ[v], vals[v]}
-        
-        movie_dicts[key] = 0
-        '''
-        origin = {categ[0], vals[0]}
-        budget = {categ[1], vals[1]}
-        domlifegross = {categ[2], vals[2]}
-        forlifegross = {categ[3], vals[3]}
-        ltdreldate = {categ[4], vals[4]}
-        ltdopenth = {categ[5], vals[5]}
-        wreldate = {categ[6],
-        '''
 
-    
 PAGENUM = 15
 PICKLEDIR = "./pkls/"
 HTMLDIR = "./bomojo/"
 BASEURL = "http://www.boxofficemojo.com/"
-
+'''
 #get_foreign_titles()
-
+'''
 fullkeys = unpickle(PICKLEDIR + "fullkeys.pkl")
 fulllocs = unpickle(PICKLEDIR + "fulllocs.pkl")
 #smallkeys = unpickle(PICKLEDIR + "keys_1.pkl")
+'''
 #get_movie_pages(fullkeys)
-get_bomojo_values(fullkeys, fulllocs)
+'''
+#movies = get_bomojo_values(fullkeys, fulllocs)
 
-OMDBURL = "http://www.omdbapi.com/?t="
-OMDBOptions = "&y=&plot=short&r=json"
+#OMDBURL = "http://www.omdbapi.com/?t="
+#OMDBOptions = "&y=&plot=short&r=json"
 #example title: Instructions+Not+Included
-movies = unpickle(PICKLEDIR + "movies.pkl")
-get_omdb_countries(movies)
+#movies = unpickle(PICKLEDIR + "movies.pkl")
+#movies = get_omdb_countries(movies)
 
 movies = unpickle(PICKLEDIR + "moviesfilled.pkl")
-#count = 0
-#for key in movies:
-#    if movies[key][0] is None:
-#        count += 1
-#print count
 
-make_na_none(movies)
-
-movies = unpickle(PICKLEDIR + "moviesnone.pkl")
-separate_genres(movies)
-
-movies = unpickle(PICKLEDIR + "moviesgenre.pkl")
-#print movies
+print clean_data(movies)
