@@ -18,6 +18,7 @@ pred_c = "orange"
 pred_al = 0.6
 data_c = "purple"
 data_al = 0.3
+THEATERLIM = 5
 
 sns.set(style="whitegrid", color_codes=True)
 
@@ -100,8 +101,18 @@ def domestic_wreldate(df):
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
-def domestic_genre(df):
-    pass
+def by_country(df, country):
+    dfC = df.loc[df["OriginC"] == country]
+    dfC_g = separate_genres(dfC)
+    cols = list(dfC_g)
+    domestic = dfC_g["DomLifeGross"]
+    genres = dfC_g.iloc[:,10:len(cols)]
+    genres.insert(0, "Intercept", 1)
+    results, predicted = make_model(genres, domestic)
+    print results.summary()
+    print results.params
+    #print dir(results)
+    return genres, domestic, results, predicted
 
 def make_model(X, y):
     #print y.head(), X.head()
@@ -180,6 +191,8 @@ def plot_domestic_country_genre(df):
 
 def plot_domestic_wopenth(X, y, predicted):
     ax = plt.subplot(111)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
@@ -188,7 +201,8 @@ def plot_domestic_wopenth(X, y, predicted):
     plt.ylabel("Domestic Lifetime Gross (millions)")
     plt.xlabel("Wide Opening Theaters")
     plt.subplot(111)
-    plt.plot(X["WOpenTh"], predicted, color=pred_c, alpha=pred_al)
+    ax.set_yscale('log')
+    plt.scatter(x=X["WOpenTh"], y=predicted, color=pred_c, alpha=pred_al)
     plt.show()
 
 def plot_domestic_widestth(X, y, predicted):
@@ -249,6 +263,19 @@ def plot_domestic_genre(df):
     sns.plt.margins(0.2)
     sns.plt.show()
 
+def plot_by_country(df):
+    x, y, results, predicted = by_country(df, "FRANCE")
+    xs = list(results.params.index)[1:]
+    ys = list(results.params.values)[1:]
+    sns.barplot(xs,ys)
+    ax = sns.plt.subplot(111)
+    ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                               pos: ('%.0f')%(x*1e-6)))
+    sns.plt.ylabel("Domestic Lifetime Gross (millions)")
+    plt.xticks(rotation=80)
+    plt.subplots_adjust(bottom=0.45)
+    plt.show()
+
 def challenge_1(df):
     X, y, results, predicted = domestic_constant(df)
     plot_domestic_constant(X, y, predicted)
@@ -274,17 +301,60 @@ df = pd.DataFrame.from_items(movies.items(), orient='index',
                                        "ForLifeGross", "LtdRelDate", 
                                        "LtdOpenTh", "WRelDate", "WOpenTh", 
                                        "WidestTh", "Genres", "Awards"])
-df = make_floats(df)
-df_g = separate_genres(df)
-df = make_datetime(df)
-df["OriginC"] = df["OriginC"].str.upper()
+def consolidate_genres():
+    newseries = df["Genres"]
+    for genre in df["Genres"].iteritems():
+        key = genre[0]
+        newlist = []
+        genlist = genre[1]
+        if "Foreign Language" in genlist:
+            genlist.remove("Foreign Language")
+        if len(genlist) > 0:
+            if len(genlist) > 1:
+                if "Foreign" in genlist:
+                    genlist.remove("Foreign")
+                if "Unknown" in genlist:
+                    genlist.remove("Unknown")
+            for g in genlist:
+                sep = g.split(" / ")
+                if len(sep) > 1:
+                    if sep[0] == "Foreign":
+                        g = sep[1]
+                    else:
+                        g = " / ".join(sep)
+                sep = g.split(" - ")
+                if len(sep) > 1:
+                    g = sep[0]
+                if g == "Foreign":
+                    g = "Unknown"
+                newlist.append(g)
+        newset = set(newlist)
+        newlist = list(newset)
+        newseries[key] = newlist
+        
+        #print genlist, newlist
+    return newseries
+
+#df["Genres"] = consolidate_genres()
+#print df.head()
+#df = make_floats(df)
+#dfl = df[df["WOpenTh"] > THEATERLIM]
+#df_g = separate_genres(dfl)
+#df = make_datetime(dfl)
+#df["OriginC"] = df["OriginC"].str.upper()
+#print df.describe()
+
+#pickle_stuff(PICKLEDIR + "dfl", df)
+
+df = unpickle(PICKLEDIR + "df")
+#print df.head()
 #print df.dtypes
 
 #domestic_constant(df)
 #domestic_foreign(df)
 #challenge_2(df)
 #plot_domestic_origin(df)
-#X, y, results, predicted = domestic_wopenth(df)
+#X, y, results, predicted = domestic_wopenth(dfl)
 #plot_domestic_wopenth(X, y, predicted)
 
 #X, y, results, predicted = domestic_widestth(df)
@@ -293,40 +363,23 @@ df["OriginC"] = df["OriginC"].str.upper()
 #X, y, results, predicted = domestic_wreldate(df)
 #plot_domestic_wreldate(df)
 
-
-dfC = df.loc[df["OriginC"] == "INDIA"]
-dfC_g = separate_genres(dfC)
-cols = list(dfC_g)
-domestic = dfC_g["DomLifeGross"]
-genres = dfC_g.iloc[:,10:len(cols)]
-genres.insert(0, "Intercept", 1)
-results, predicted = make_model(genres, domestic)
-print results.summary()
-
 '''
-genres = cols[10:len(cols)]
-genres_ = []
-for genre in genres:
-    genre = genre.replace(" / ", " ")
-    genre = genre.replace(" - ", " ")
-    if genre[0].isdigit():
-        genre = "_"+genre
-    #genre = '"'+genre+'"'
-    genres_.append(genre)
-#print genres
-cols = cols[:10] + genres_
-
-genres = []
-#for genre in genres_:
-#    genre = '"' + genre + '"'
-#    genres.append(genre)
-#print "cols", cols
-genres_str = ' + '.join(genres_)
-dfIn_g.columns = cols
-print list(dfIn_g)
-print genres_str
-y, X = dmatrices('DomLifeGross ~ %s' %genres_str, data=dfIn_g, return_type = 'dataframe')
-print "Domestic from Origin Country"
-results, predicted = make_model(X, y)
-#return X, y, results, predicted
+X, y, results, predicted = by_country(df, "CHINA")
+ax = plt.subplot(111)
+ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                               pos: ('%.0f')%(x*1e-6)))
+ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
+plt.plot(results.params, color = data_c, alpha=data_al)
+plt.plot(predicted)
+plt.ylabel("Domestic Lifetime Gross (millions)")
+plt.xlabel("Genres")
+plt.subplot(111)
+plt.plot(X["WOpenTh"], predicted, color=pred_c, alpha=pred_al)
+plt.show()
 '''
+#does country or genre matter more? reduce # genres
+#drop movies with lim release of less than 5-10
+#linear in logvslog
+
+
+
