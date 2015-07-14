@@ -1,4 +1,5 @@
 import pickle
+#import math
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -18,9 +19,65 @@ pred_c = "orange"
 pred_al = 0.6
 data_c = "purple"
 data_al = 0.3
-THEATERLIM = 5
+THEATERLIM = 6
 
 sns.set(style="whitegrid", color_codes=True)
+
+def initial_dataframe():
+    movies = unpickle(PICKLEDIR + "cleanmovies.pkl")
+    df = pd.DataFrame.from_items(movies.items(), orient='index', 
+                               columns=["OriginC", "Budget", "DomLifeGross",
+                                       "ForLifeGross", "LtdRelDate", 
+                                       "LtdOpenTh", "WRelDate", "WOpenTh", 
+                                       "WidestTh", "Genres", "Awards"])
+    df["Genres"] = consolidate_genres(df)
+    #print df.head()
+    df = set_dataframe(df)
+    #print df.describe()
+    pickle_stuff(PICKLEDIR + "df", df)
+    return df
+
+def set_dataframe(df):
+    df = make_floats(df)
+    df = make_floats(df)
+    df_ = df[df["WidestTh"] >= THEATERLIM] 
+    dfl = df_[df_["WOpenTh"] >= THEATERLIM]
+    #df_g = separate_genres(dfl)
+    df = make_datetime(dfl)
+    df["OriginC"] = df["OriginC"].str.upper()
+    return df
+
+def consolidate_genres(df):
+    newseries = df["Genres"]
+    for genre in df["Genres"].iteritems():
+        key = genre[0]
+        newlist = []
+        genlist = genre[1]
+        if "Foreign Language" in genlist:
+            genlist.remove("Foreign Language")
+        if len(genlist) > 0:
+            if len(genlist) > 1:
+                if "Foreign" in genlist:
+                    genlist.remove("Foreign")
+                if "Unknown" in genlist:
+                    genlist.remove("Unknown")
+            for g in genlist:
+                sep = g.split(" / ")
+                if len(sep) > 1:
+                    if sep[0] == "Foreign":
+                        g = sep[1]
+                    else:
+                        g = " / ".join(sep)
+                sep = g.split(" - ")
+                if len(sep) > 1:
+                    g = sep[0]
+                if g == "Foreign":
+                    g = "Unknown"
+                newlist.append(g)
+        newset = set(newlist)
+        newlist = list(newset)
+        newseries[key] = newlist
+    return newseries
 
 def pickle_stuff(filename, data):
     with open(filename, 'w') as picklefile:
@@ -78,17 +135,23 @@ def domestic_origin_foreign(df):
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
-def domestic_wopenth(df):
+def domestic_wopenth(df, log=False):
     y, X = dmatrices("DomLifeGross ~ WOpenTh", data=df, 
                      return_type = 'dataframe')
     print "Domestic from Wide Opening Theaters"
+    if log:
+        X = np.log(X)
+        y = np.log(y)
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
-def domestic_widestth(df):
+def domestic_widestth(df, log=False):
     y, X = dmatrices("DomLifeGross ~ WidestTh", data=df, 
                      return_type = 'dataframe')
     print "Domestic from Widest Release"
+    if log:
+        X = np.log(X)
+        y = np.log(y)
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
@@ -176,6 +239,7 @@ def plot_domestic_origin(df):
     #plt.scatter(x=X, y=y, alpha=0.3)
     sns.plt.show()
 
+'''
 def plot_domestic_country_genre(df):
     ax = plt.subplot(111)
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
@@ -188,11 +252,12 @@ def plot_domestic_country_genre(df):
     plt.subplot(111)
     plt.plot(X["WOpenTh"], predicted, color=pred_c, alpha=pred_al)
     plt.show()
-
-def plot_domestic_wopenth(X, y, predicted):
+'''
+def plot_domestic_wopenth(X, y, predicted, log=False):
     ax = plt.subplot(111)
-    ax.set_yscale('log')
-    ax.set_xscale('log')
+    if log:
+        ax.set_xscale('log')
+        ax.set_yscale('log')
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
@@ -201,12 +266,17 @@ def plot_domestic_wopenth(X, y, predicted):
     plt.ylabel("Domestic Lifetime Gross (millions)")
     plt.xlabel("Wide Opening Theaters")
     plt.subplot(111)
-    ax.set_yscale('log')
+    #if log:
+    #    ax.set_xscale('log')
+    #    ax.set_yscale('log')
     plt.scatter(x=X["WOpenTh"], y=predicted, color=pred_c, alpha=pred_al)
     plt.show()
 
-def plot_domestic_widestth(X, y, predicted):
+def plot_domestic_widestth(X, y, predicted, log=False):
     ax = plt.subplot(111)
+    if log:
+        ax.set_yscale('log')
+        ax.set_xscale('log')
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
@@ -215,9 +285,10 @@ def plot_domestic_widestth(X, y, predicted):
     plt.ylabel("Domestic Lifetime Gross (millions)")
     plt.xlabel("Theaters at Widest Release")
     plt.subplot(111)
-    plt.plot(X["WidestTh"], predicted, color=pred_c, alpha=pred_al)
+    plt.scatter(x=X["WidestTh"], y=predicted, color=pred_c, alpha=pred_al)
     plt.show()
 
+'''
 def plot_domestic_wreldate(df):
     np.random.seed(sum(map(ord, "categorical")))
     
@@ -236,8 +307,9 @@ def plot_domestic_wreldate(df):
     #np.random.seed(sum(map(ord, "regression")))
     #sns.lmplot(x="WRelDate", y="DomLifeGross", data=df);
     sns.plt.show()
-    '''
-    
+
+'''
+'''
     #print X
     plt.scatter(x=X["WRelDate"].to_pydatetime(), y=y["DomLifeGross"], color = data_c, 
                 alpha=data_al)
@@ -246,8 +318,9 @@ def plot_domestic_wreldate(df):
     plt.subplot(111)
     plt.plot(X["WRelDate"], predicted, color=pred_c, alpha=pred_al)
     plt.show()
-    '''
+'''
 
+'''
 def plot_domestic_genre(df):
     np.random.seed(sum(map(ord, "categorical")))
     
@@ -262,6 +335,7 @@ def plot_domestic_genre(df):
     plt.set_xticklabels(rotation=30)
     sns.plt.margins(0.2)
     sns.plt.show()
+'''
 
 def plot_by_country(df):
     x, y, results, predicted = by_country(df, "FRANCE")
@@ -294,59 +368,11 @@ def challenge_3_2(df):
     X, y, results, predicted = domestic_origin_foreign(df)
     plot_residuals(results)
 
-movies = unpickle(PICKLEDIR + "cleanmovies.pkl")
 
-df = pd.DataFrame.from_items(movies.items(), orient='index', 
-                               columns=["OriginC", "Budget", "DomLifeGross",
-                                       "ForLifeGross", "LtdRelDate", 
-                                       "LtdOpenTh", "WRelDate", "WOpenTh", 
-                                       "WidestTh", "Genres", "Awards"])
-def consolidate_genres():
-    newseries = df["Genres"]
-    for genre in df["Genres"].iteritems():
-        key = genre[0]
-        newlist = []
-        genlist = genre[1]
-        if "Foreign Language" in genlist:
-            genlist.remove("Foreign Language")
-        if len(genlist) > 0:
-            if len(genlist) > 1:
-                if "Foreign" in genlist:
-                    genlist.remove("Foreign")
-                if "Unknown" in genlist:
-                    genlist.remove("Unknown")
-            for g in genlist:
-                sep = g.split(" / ")
-                if len(sep) > 1:
-                    if sep[0] == "Foreign":
-                        g = sep[1]
-                    else:
-                        g = " / ".join(sep)
-                sep = g.split(" - ")
-                if len(sep) > 1:
-                    g = sep[0]
-                if g == "Foreign":
-                    g = "Unknown"
-                newlist.append(g)
-        newset = set(newlist)
-        newlist = list(newset)
-        newseries[key] = newlist
-        
-        #print genlist, newlist
-    return newseries
 
-#df["Genres"] = consolidate_genres()
-#print df.head()
-#df = make_floats(df)
-#dfl = df[df["WOpenTh"] > THEATERLIM]
-#df_g = separate_genres(dfl)
-#df = make_datetime(dfl)
-#df["OriginC"] = df["OriginC"].str.upper()
-#print df.describe()
-
-#pickle_stuff(PICKLEDIR + "dfl", df)
-
+#initial_dataframe()
 df = unpickle(PICKLEDIR + "df")
+#df = set_dataframe(df)
 #print df.head()
 #print df.dtypes
 
@@ -354,29 +380,19 @@ df = unpickle(PICKLEDIR + "df")
 #domestic_foreign(df)
 #challenge_2(df)
 #plot_domestic_origin(df)
-#X, y, results, predicted = domestic_wopenth(dfl)
-#plot_domestic_wopenth(X, y, predicted)
+X, y, results, predicted = domestic_wopenth(df)
+plot_domestic_wopenth(X, y, predicted)
+X,y, results, predicted = domestic_wopenth(df, True)
+plot_domestic_wopenth(X, y, predicted, True)
 
-#X, y, results, predicted = domestic_widestth(df)
-#plot_domestic_widestth(X, y, predicted)
+X, y, results, predicted = domestic_widestth(df)
+plot_domestic_widestth(X, y, predicted)
+X, y, results, predicted = domestic_widestth(df, True)
+plot_domestic_widestth(X, y, predicted, True)
 
 #X, y, results, predicted = domestic_wreldate(df)
 #plot_domestic_wreldate(df)
 
-'''
-X, y, results, predicted = by_country(df, "CHINA")
-ax = plt.subplot(111)
-ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
-                                               pos: ('%.0f')%(x*1e-6)))
-ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
-plt.plot(results.params, color = data_c, alpha=data_al)
-plt.plot(predicted)
-plt.ylabel("Domestic Lifetime Gross (millions)")
-plt.xlabel("Genres")
-plt.subplot(111)
-plt.plot(X["WOpenTh"], predicted, color=pred_c, alpha=pred_al)
-plt.show()
-'''
 #does country or genre matter more? reduce # genres
 #drop movies with lim release of less than 5-10
 #linear in logvslog
