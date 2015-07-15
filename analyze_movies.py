@@ -97,7 +97,9 @@ def make_floats(df):
 def make_datetime(df):
     df["LtdRelDate"] = pd.to_datetime(df["LtdRelDate"], 
                                       infer_datetime_format=True)
+    df["LtdRelDate"] = df["LtdRelDate"].map(lambda x: x.year)
     df["WRelDate"] = pd.to_datetime(df["WRelDate"], infer_datetime_format=True)
+    df["WRelDate"] = df["WRelDate"].map(lambda x: x.year)
     return df
 
 def separate_genres(df):
@@ -142,6 +144,20 @@ def domestic_foreign_wopenth(df):
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
+def domestic_origin_wopenth(df):
+    y, X = dmatrices("DomLifeGross ~ OriginC + WOpenTh", data=df,
+                     return_type = 'dataframe')
+    print "Domestic from Country and Wide Opening Theaters"
+    results, predicted = make_model(X, y)
+    return X, y, results, predicted
+
+def domestic_origin_wopenth_wreldate(df):
+    y, X = dmatrices("DomLifeGross ~ OriginC + WOpenTh + WRelDate", data=df,
+                     return_type = 'dataframe')
+    print "Domestic from Country + Opening Theaters + Release Date"
+    results, predicted = make_model(X, y)
+    return X, y, results, predicted
+
 def domestic_budget(df):
     y, X = dmatrices("DomLifeGross ~ Budget", data=df, return_type='dataframe')
     print "Domestic from Budget"
@@ -177,10 +193,13 @@ def domestic_wreldate(df):
     results, predicted = make_model(X, y)
     return X, y, results, predicted
 
-def by_country(df, country=None):
+def domestic_genre_by_country(df, country=None):
+    '''Domestic Life Gross from Genre per Country'''
     if country:
+        print country
         dfC = df.loc[df["OriginC"] == country]
     else:
+        print "All Countries"
         dfC = df
     dfC_g = separate_genres(dfC)
     cols = list(dfC_g)
@@ -203,19 +222,12 @@ def domestic_genre(df):
     #print results.params
     return genres, domestic, results, predicted
 
-#def genres_df
-
 def make_model(X, y):
-    #print y.head(), X.head()
     model = sm.OLS(y,X)
     results = model.fit()
-    #print results.summary()
-    #print "Parameters:", results.params
     print "R Squared:", results.rsquared
     print "Adj. R Squared:", results.rsquared_adj
-    #print "Standard Errors", results.bse
     predicted = results.predict()
-    #print "Predicted Values", predicted
     return results, predicted
 
 def plot_domestic_constant(X, y, predicted):
@@ -278,13 +290,13 @@ def plot_domestic_wreldate(df):
     sns.despine()
     sns.plt.show()
 
-def plot_domestic_origin(df):
-    np.random.seed(sum(map(ord, "categorical")))
+def plot_domestic_origin(df, predicted=None):
+    #np.random.seed(sum(map(ord, "categorical")))
     ax = plt.subplot(111)
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
     #ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
-    g = sns.stripplot(x="DomLifeGross", y="OriginC", data=df)
+    sns.stripplot(x="DomLifeGross", y="OriginC", data=df)
     sns.plt.xlabel("Domestic Lifetime Gross (millions)")
     sns.plt.ylabel("Country of Origin")
     #print "domestic origin"
@@ -293,21 +305,29 @@ def plot_domestic_origin(df):
     sns.despine()
     sns.plt.show()
 
-def plot_domestic_origin_bar(df, kind='bar'):
+def plot_domestic_origin_pred(df, predicted):
+    df_seaborn = pd.DataFrame(zip(df["DomLifeGross"], predicted), columns = ["ActDomLifeGross", "PredDomLifeGross"])
+    print df_seaborn.head()
+    ax = plt.subplot(111)
+    ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.0f')%(x*1e-6)))
+    ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.0f')%(x*1e-6)))
+    sns.regplot(x="ActDomLifeGross", y="PredDomLifeGross", data=df_seaborn, 
+                color=data_c, line_kws = {"color" : pred_c})
+    sns.plt.show()
+
+def plot_domestic_origin_bar(df):
     grouped = df.groupby("OriginC")
     means = grouped.DomLifeGross.mean()
     errors = grouped.DomLifeGross.std()
     ax = plt.subplot(111)
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
-    #ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
-    means.plot(x="OriginC", yerr=errors, ax=ax, kind=kind, color=data_c, ecolor=pred_c)
-    #plt.yticks(df["OriginC"])
+    means.plot(x="OriginC", yerr=errors, ax=ax, kind='bar', color=data_c, 
+               ecolor=pred_c)
     grosslabel = "Domestic Lifetime Gross (millions)"
     clabel = "Country of Origin"
-    #if kind=='barh':
-    #    plt.ylabel(clabel)
-    #    plt.xlabel(grosslabel)
     ax.xaxis.grid(False)
     plt.xlabel(clabel)
     plt.ylabel(grosslabel)
@@ -322,15 +342,14 @@ def plot_domestic_wopenth(X, y, predicted, log=False):
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
-    plt.scatter(x=X["WOpenTh"], y=y["DomLifeGross"], color = data_c, 
-                alpha=data_al)
+    sns.regplot(x=X["WOpenTh"], y=y["DomLifeGross"], color = data_c, line_kws = {"color" : pred_c})
     plt.ylabel("Domestic Lifetime Gross (millions)")
     plt.xlabel("Wide Opening Theaters")
     plt.subplot(111)
     if log:
         ax.set_xscale('log')
         ax.set_yscale('log')
-    plt.scatter(x=X["WOpenTh"], y=predicted, color=pred_c, alpha=pred_al)
+    #plt.scatter(x=X["WOpenTh"], y=predicted, color=pred_c, alpha=pred_al)
     plt.show()
 
 def plot_domestic_widestth(X, y, predicted, log=False):
@@ -352,8 +371,8 @@ def plot_domestic_widestth(X, y, predicted, log=False):
     plt.scatter(x=X["WidestTh"], y=predicted, color=pred_c, alpha=pred_al)
     plt.show()
 
-def plot_by_country(df, country=None):
-    x, y, results, predicted = by_country(df, country)
+def plot_domestic_genre_by_country(df, country=None):
+    x, y, results, predicted = domestic_genre_by_country(df, country)
     xs = list(results.params.index)[1:]
     ys = list(results.params.values)[1:]
     sns.barplot(ys,xs, color=data_c, alpha=pred_al)
@@ -364,7 +383,6 @@ def plot_by_country(df, country=None):
     if country is None:
         country = "All Countries"
     plt.title("Params, " + country)
-    #plt.xticks(rotation=90)
     plt.subplots_adjust(left=0.25)
     plt.show()
     return results
@@ -373,14 +391,12 @@ def plot_by_genre_mean(df, unknown = False):
     df_g = separate_genres(df)
     cols = list(df_g)
     gen_cols = cols[10:]
-    domestic = df_g["DomLifeGross"]
     xsk = []
     ysk = []
     errs = []
     for c in gen_cols:
         if unknown:
             xsk.append(c)
-            #ysk.append(df_g[c].sum())
             df1g = df.loc[df_g[c] > 0 ]
             ysk.append(df1g["DomLifeGross"].mean())
             errs.append(df1g["DomLifeGross"].std())
@@ -421,18 +437,17 @@ def plot_by_genre_count(df, unknown=False):
                 plt.title("# Movies by Known Genre")
     if len(xsk) > 0:
         sns.barplot(x=ysk, y=xsk, color=data_c, alpha=pred_al)
-        #plt.xticks(rotation=90)
         plt.xlabel("Number of Movies")
         plt.ylabel("Genre")
         plt.subplots_adjust(left=0.35)
         plt.show()
 
-def plot_by_country_count(df, country):
+def plot_genre_country_count(df, country):
+    '''plot number of movies per genre per country'''
     dfC = df.loc[df["OriginC"] == country]
     dfC_g = separate_genres(dfC)
     cols = list(dfC_g)
     gen_cols = cols[10:]
-    domestic = dfC_g["DomLifeGross"]
     xsk = []
     ysk = []
     for c in gen_cols:
@@ -448,6 +463,16 @@ def plot_by_country_count(df, country):
         plt.subplots_adjust(left=0.25)
         plt.show()
 
+def wreldate_hist(df):
+    '''Plot a histogram of movies per year'''
+    wd = df["WRelDate"]
+    bins = df["WRelDate"].max() - df["WRelDate"].min()
+    wd.hist(bins=bins, color=data_c, alpha=data_al)
+    plt.xlabel("Release Year")
+    plt.ylabel("# Movies")
+    plt.title("Foreign Movies per Year")
+    plt.show()
+
 def challenge_1(df):
     X, y, results, predicted = domestic_constant(df)
     plot_domestic_constant(X, y, predicted)
@@ -460,16 +485,16 @@ def challenge_2(df):
 
 def challenge_3(df):
     X, y, results, predicted = domestic_origin(df)
+    plot_domestic_origin(df, predicted)
     plot_residuals(results)
 
-def challenge_3_2(df):
+def challenge_4(df):
     X, y, results, predicted = domestic_origin_foreign(df)
     plot_residuals(results)
 
-
 def run_all(df):
-    X, y, results, predicted = domestic_foreign(df)
-    plot_domestic_foreign(X, y, predicted)
+    #X, y, results, predicted = domestic_foreign(df)
+    #plot_domestic_foreign(X, y, predicted)
     
     X, y, results, predicted = domestic_wopenth(df)
     plot_domestic_wopenth(X, y, predicted)
@@ -478,51 +503,54 @@ def run_all(df):
     plot_domestic_wopenth(X, y, predicted, True)
     #print results.summary()
     
-    X, y, results, predicted = domestic_foreign_wopenth(df)
-    print results.summary()
+    #X, y, results, predicted = domestic_foreign_wopenth(df)
+    #print results.summary()
 
     X, y, results, predicted = domestic_widestth(df)
-    plot_domestic_widestth(X, y, predicted)
+    #plot_domestic_widestth(X, y, predicted)
     X, y, results, predicted = domestic_widestth(df, True)
-    plot_domestic_widestth(X, y, predicted, True)
+    #plot_domestic_widestth(X, y, predicted, True)
 
     X, y, results, predicted = domestic_origin(df)
     #print results.summary()
-    plot_domestic_origin(df)
+    plot_domestic_origin_pred(df, predicted)
     X, y, results, predicted = domestic_origin_foreign(df)
     #print results.summary()
-    plot_domestic_origin_bar(df)
-    plot_by_genre_mean(df)
+    #plot_domestic_origin_bar(df)
+    #plot_by_genre_mean(df)
 
     X, y, results, predicted = domestic_budget(df)
     #print results.summary()
-    plot_domestic_budget(X, y, predicted)
+    #plot_domestic_budget(X, y, predicted)
     
     X, y, results, predicted = domestic_genre(df)
     #print results.summary()
-    plot_by_genre_count(df)
-    plot_by_genre_count(df, True)
+    #plot_by_genre_count(df)
+    #plot_by_genre_count(df, True)
     
     
-    country_list = ["INDIA", "FRANCE"]#,  "BRAZIL", "ARGENTINA", "BELGIUM", "DENMARK", "GERMANY", "CANADA", "HOLLAND", "ISRAEL", "JAPAN", "LEBANON", "NORWAY", "PALESTINE", "ROMANIA", "RUSSIA", "SWITZERLAND", "SOUTH KOREA", "CZECH", "SWEDEN", "THAILAND", "TAIWAN", "POLAND", "INDONESIA", "NETHERLANDS"]#
+    #country_list = ["INDIA", "FRANCE"]#,  "BRAZIL", "ARGENTINA", "BELGIUM", "DENMARK", "GERMANY", "CANADA", "HOLLAND", "ISRAEL", "JAPAN", "LEBANON", "NORWAY", "PALESTINE", "ROMANIA", "RUSSIA", "SWITZERLAND", "SOUTH KOREA", "CZECH", "SWEDEN", "THAILAND", "TAIWAN", "POLAND", "INDONESIA", "NETHERLANDS"]#
     #France, india
-    for country in country_list:
-        plot_by_country_count(df, country)
-        results = plot_by_country(df, country)
-        #    #print results.summary()
-    plot_by_country(df)
+    #for country in country_list:
+    #    plot_genre_country_count(df, country)
+    #    results = plot_domestic_genre_by_country(df, country)
+    #    #    #print results.summary()
+    #plot_domestic_genre_by_country(df)
 
 
 #initial_dataframe()
 df = unpickle(PICKLEDIR + "df")
-#df = set_dataframe(df)
 #print df.head()
 #print df.dtypes
 
-#domestic_constant(df)
-X, y, results, predicted = domestic_wreldate(df)
-#print results.rsquared
-plot_domestic_wreldate(df)
+#X, y, results, predicted = domestic_wreldate(df)
+#plot_domestic_wreldate(df)
+
+#wreldate_hist(df)
+
+domestic_origin_wopenth(df)
+
+domestic_origin_wopenth_wreldate(df)
 
 #does country or genre matter more? reduce # genres
 #drop movies with lim release of less than 5-10
@@ -530,11 +558,17 @@ plot_domestic_wreldate(df)
 
 #crunchbase.com, angel.co
 
+def run_challenges(df):
+    #challenge_1(df)
+    #challenge_2(df)
+    challenge_3(df)
+    #challenge_4(df)
 
+#run_challenges(df)
 run_all(df)
 
-print "Dropping 'Crouching Tiger, Hidden Dragon'"
-df_sad = df[df["DomLifeGross"] < 80000000]    
-run_all(df_sad)
+#print "Dropping 'Crouching Tiger, Hidden Dragon'"
+#df_sad = df[df["DomLifeGross"] < 80000000]    
+#run_all(df_sad)
 
 #scikit learn crossvalidation train_test_split
