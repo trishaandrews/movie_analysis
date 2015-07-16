@@ -9,7 +9,7 @@ from patsy import dmatrices
 from collections import Counter
 from sklearn.cross_validation import train_test_split
 from sklearn.metrics import mean_squared_error
-from sklearn import datases, linear_model
+from sklearn import linear_model
 
 '''
 columns=["OriginC", "Budget", "DomLifeGross","ForLifeGross", "LtdRelDate", 
@@ -23,7 +23,7 @@ pred_al = 0.6
 data_c = "purple"
 data_al = 0.6
 THEATERLIM = 10
-COUNTRYLIM = 12
+COUNTRYLIM = 10
 
 sns.set(style="whitegrid", color_codes=True)
 
@@ -142,14 +142,6 @@ def domestic_origin(df):
     print "Domestic from Origin Country"
     results, predicted = make_model(X, y)
     return X, y, results, predicted
-'''
-def domestic_genre(df):
-    df_g = separate_genres(df)
-    cols = list(df_g)
-    gen_cols = cols[10:]
-    colstr = "+".join(gen_cols)
-    print colstr
-'''
  
 def domestic_origin_foreign(df):
     y, X = dmatrices("DomLifeGross ~ OriginC + ForLifeGross", data=df, 
@@ -543,18 +535,17 @@ def run_all(df):
     plot_by_genre_count(df, True)
     
     
-    country_list = ["INDIA", "FRANCE"]#,  "BRAZIL", "ARGENTINA", "BELGIUM", "DENMARK", "GERMANY", "CANADA", "HOLLAND", "ISRAEL", "JAPAN", "LEBANON", "NORWAY", "PALESTINE", "ROMANIA", "RUSSIA", "SWITZERLAND", "SOUTH KOREA", "CZECH", "SWEDEN", "THAILAND", "TAIWAN", "POLAND", "INDONESIA", "NETHERLANDS"]#
+    country_list = ["INDIA", "FRANCE"]
     #France, india
     for country in country_list:
         plot_genre_country_count(df, country)
         results = plot_domestic_genre_by_country(df, country)
     plot_domestic_genre_by_country(df)
 
-
 #initial_dataframe()
 df = unpickle(PICKLEDIR + "df")
 
-X, y, results, predicted = domestic_wreldate(df)
+#X, y, results, predicted = domestic_wreldate(df)
 #plot_domestic_wreldate(df)
 
 #wreldate_hist(df)
@@ -562,10 +553,6 @@ X, y, results, predicted = domestic_wreldate(df)
 #domestic_origin_wopenth(df)
 
 #domestic_origin_wopenth_wreldate(df)
-
-#does country or genre matter more? reduce # genres
-#drop movies with lim release of less than 5-10
-#linear in logvslog
 
 #crunchbase.com, angel.co
 
@@ -613,41 +600,79 @@ def run_specifics(df):
     #plot_by_genre_count(df)
     #plot_by_genre_count(df, True)
     
+
+    
+def test_train(X, y, title="All Countries", xlab=None, ylab="Domestic", r_state=None, set_x=False):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=r_state)
+    
+    smols = sm.OLS(y_train,X_train).fit()
+    smols_pred_y = smols.predict(X_test)
+
+    regr = linear_model.LinearRegression()
+    regr.fit(X_train, y_train)
+    # The coefficients
+    print('Coefficients: \n', regr.coef_)
+    # The mean square error
+    print("Residual sum of squares: %.2f" % np.mean((regr.predict(X_test) - 
+                                                     y_test) ** 2))
+    # Explained variance score: 1 is perfect prediction
+    print('New Variance score: %.2f' % regr.score(X_test, y_test))
+
+    ax = plt.subplot(111)
+    X_list = map(lambda x: x[1], X_test)
+    ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.0f')%(x*1e-6)))
+    if set_x:
+         ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.0f')%(x*1e-6)))
+    plt.scatter(X_list, y_test, color=data_c, alpha=data_al)
+    plt.plot(X_list, regr.predict(X_test), color=pred_c, alpha=pred_al)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title(title)
+    plt.show()
+
+def test_split(df, country="All Countries"):
+    X, y, _, _ = domestic_foreign(df)
+    test_train(X, y, title=country, xlab="Foreign", set_x=True)
+
+    X, y, _, _ = domestic_wopenth(df)
+    test_train(X, y, title=country, xlab="Wide Open Theaters")
+
+    X, y, _, _ = domestic_widestth(df)
+    test_train(X, y, title=country, xlab="Widest Theaters")
+
+    #X, y, _, _ = domestic_genre(df)
+    #test_train(X, y, title=country, xlab="Genre")
+
+
 countries = df["OriginC"].values
 counts = Counter(countries)
 countries = counts.most_common(COUNTRYLIM)
-for c in countries:
-    print c[0]
-    dfC = df.loc[df["OriginC"] == c[0]]
-    run_specifics(dfC)
-print countries
-    
+#for c in countries:
+#    print c[0]
+#    dfC = df.loc[df["OriginC"] == c[0]]
+#    #run_specifics(dfC)
+#    test_split(dfC, c[0])
+#print countries
 
-def test_split(df):
-    X, y, _, _ = domestic_foreign(df)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-    model = sm.OLS(y_train,X_train)
-    results = model.fit()
-    y_pred_test = results.predict(X_test)
-    print type(y_test)
-    #y_test = np.array(y_test[0])
-    test_error = mean_squared_error(y_test, y_pred_test)
-    print "test error", test_error
-    
-    #fig = plt.figure(figsize=(8,6))
-    ax = plt.subplot(111)
-    #print y_test["DomLifeGross"]
-    df_ = pd.DataFrame(zip(y_test, y_pred_test), columns = ['Actual', 'Predicted'])
+print "Test Train for Action Genre"
+df_a = df_g[df_g["Action"] == 1]
+test_split(df_a)
 
-    sns.regplot(x='Actual', y='Predicted', data= df_, color=data_c, line_kws = {"color":pred_c})
-    plt.show()
-    X, y, _, _ = domestic_wopenth(df)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+print "Dropping 'Crouching Tiger, Hidden Dragon'"
+df_sad = df[df["DomLifeGross"] < 80000000]
+df_g = separate_genres(df_sad)
+df_a = df_g[df_g["Action"] == 1]
+test_split(df_a)
 
-    X, y, _, _ = domestic_widestth(df)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 
-    X, y, _, _ = domestic_genre(df)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+#cols = list(df_g)
+#genres = df_g.iloc[:,10:]
+#for g in genres:
+#counts = genres.sum()
+#Counter(df_g.iloc[:,10:].apply(lambda column: column.sum()))
 
-test_split(df)
+#new_list = zip(list(genres), counts)
+#genres_counts = sorted(new_list, reverse=True, key=lambda x: x[1])
+#print df_a.head()
