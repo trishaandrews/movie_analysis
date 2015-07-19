@@ -92,7 +92,7 @@ def parse_foreignlanguage_table(soup):
                                                         re.compile("\((.*?)\)"))
                         loclist.append(location)
                     linklist.append(links)
-        if len(linklist) > 0:
+        if len(linklist) > 0: #only need the one table of links
             return linklist, loclist
 
 def get_foreign_titles():
@@ -197,6 +197,8 @@ def get_nice_data(soup):
     return budget, main_genre, domestic
 
 def get_bomojo_values(fullkeys, fulllocs):
+    '''combine all the bomojo data into a dictionary with movie title, link 
+    keys'''
     movies= {}
     for key in fullkeys:
         title = key[0].replace(" ", "_")
@@ -233,7 +235,7 @@ def get_bomojo_values(fullkeys, fulllocs):
     return movies
 
 def get_omdb_countries(movies):
-    #count = 0
+    '''fill in missing country data with values from OMDB'''
     for key in movies:
         vals = movies[key]
         if vals[0] is None:
@@ -254,14 +256,11 @@ def get_omdb_countries(movies):
                     print type(country), country
             vals[0] = country
             movies[key] = vals
-        #if count >= 10:
-        #    break
     pickle_stuff(PICKLEDIR + "moviesfilled.pkl", movies)
     return movies
 
 def clean_and_make_none(vals):
-    #for key in movies:
-    #    vals = movies[key]
+    '''remove difficult characters and change N/As to None'''
     newvals = []
     for v in range(len(vals)):
         item = vals[v]
@@ -277,49 +276,6 @@ def clean_and_make_none(vals):
                 item = float(vallist[0])*(10**6)
         newvals.append(item)
     return newvals
-
-def separate_genres(vals):
-    #(OriginC, Budget, DomLifeGross, ForLifeGross, LtdRelDate, LtdOpenTh,
-    #          WRelDate, WOpenTh, WidestTh, Genre1, Genre2, Genre3,
-    #          Genre4, Awards?)
-    front_vals = vals[:9]
-    genre_list = vals[9]
-    awards = vals[10]
-    g_lim = len(genre_list)
-    genre1 = None 
-    genre2 = None
-    genre3 = None
-    genre4 = None
-    if g_lim >= 1:
-        genre1 = genre_list[0]
-    if g_lim >= 2:
-        genre2 = genre_list[1]
-    if g_lim >= 3:
-        genre3 = genre_list[2]
-    if g_lim >= 4:
-        genre4 = genre_list[3]
-    new_vals = front_vals + [genre1, genre2, genre3, genre4] + [awards]
-    return new_vals
-        
-def compare_genres(movies):
-    keylist = movies.keys()
-    for key in range(len(keylist)):
-        vals = movies[keylist[key]]
-        for k in range(len(keylist)):
-            vals2 = movies[keylist[k]]
-            if key != k:
-                for v1 in range(4):
-                    genre1 = vals[9+v1]
-                    for v2 in range(v1+1, 4):
-                        if v1 != v2:
-                            genre2 = vals2[9+v2]
-                            if genre1 == genre2:
-                                temp = genre2
-                                vals2[9+v2] = vals2[9+v1]
-                                vals2[9+v1] = temp
-                                #movies[k] = vals2
-            
-    return movies
     
 def clean_data(movies):
     for key in movies:
