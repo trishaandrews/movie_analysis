@@ -76,6 +76,7 @@ def get_movie_value(soup, field_name):
         return None
 
 def parse_foreignlanguage_table(soup):
+    '''retrieve information from the bomojo foreign language table'''
     tables = soup.find_all('table')
     linklist = []
     loclist = []
@@ -87,18 +88,21 @@ def parse_foreignlanguage_table(soup):
                 links = col.findAll('a', href=re.compile("movies"))
                 if len(links) > 0:
                     for link in links:
-                        location = link.findNextSibling(text = re.compile("\((.*?)\)"))
+                        location = link.findNextSibling(text = 
+                                                        re.compile("\((.*?)\)"))
                         loclist.append(location)
                     linklist.append(links)
         if len(linklist) > 0:
             return linklist, loclist
 
 def get_foreign_titles():
+    '''get titles from the bomojo foreign language pages'''
     fullkeys = []
     fulllocs = {}
     for i in range(PAGENUM):
         page_n = i+1
-        url = "http://www.boxofficemojo.com/genres/chart/?view=main&sort=gross&order=DESC&pagenum=%d&id=foreign.htm" %page_n
+        url = "http://www.boxofficemojo.com/genres/chart/?view=main&sort=
+        gross&order=DESC&pagenum=%d&id=foreign.htm" %page_n
         
         page = connection_process(url)
         soup = BeautifulSoup(page)
@@ -229,7 +233,7 @@ def get_bomojo_values(fullkeys, fulllocs):
     return movies
 
 def get_omdb_countries(movies):
-    count = 0
+    #count = 0
     for key in movies:
         vals = movies[key]
         if vals[0] is None:
@@ -250,8 +254,8 @@ def get_omdb_countries(movies):
                     print type(country), country
             vals[0] = country
             movies[key] = vals
-        if count >= 10:
-            break
+        #if count >= 10:
+        #    break
     pickle_stuff(PICKLEDIR + "moviesfilled.pkl", movies)
     return movies
 
@@ -316,18 +320,12 @@ def compare_genres(movies):
                                 #movies[k] = vals2
             
     return movies
-                            
-                    
-                        
-            
+    
 def clean_data(movies):
     for key in movies:
         vals = movies[key]
-        #vals = separate_genres(vals)
         vals = clean_and_make_none(vals)
-        #print vals
         movies[key] = vals
-    #movies = compare_genres(movies)
     pickle_stuff(PICKLEDIR + "cleanmovies.pkl", movies)
     return movies
         
