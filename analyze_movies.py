@@ -35,9 +35,7 @@ def initial_dataframe():
                                        "LtdOpenTh", "WRelDate", "WOpenTh", 
                                        "WidestTh", "Genres", "Awards"])
     df["Genres"] = consolidate_genres(df)
-    #print df.head()
     df = set_dataframe(df)
-    #print df.describe()
     pickle_stuff(PICKLEDIR + "df", df)
     return df
 
@@ -45,8 +43,6 @@ def set_dataframe(df):
     df = make_floats(df)
     df = make_floats(df)
     df_ = df[df["WidestTh"] >= THEATERLIM] 
-    #dfl = df_[df_["WOpenTh"] >= THEATERLIM]
-    #df_g = separate_genres(dfl)
     df = make_datetime(df_)
     df["OriginC"] = df["OriginC"].str.upper()
     return df
@@ -210,7 +206,7 @@ def domestic_genre_by_country(df, country=None):
     '''Domestic Life Gross from Genre per Country'''
     if country:
         print country
-        dfC = df.loc[df["OriginC"] == coutry]
+        dfC = df.loc[df["OriginC"] == country]
     else:
         print "All Countries"
         dfC = df
@@ -232,17 +228,12 @@ def domestic_genre(df):
     genres = df_g.iloc[:,10:len(cols)]
     genres.insert(0, "Intercept", 1)
     results, predicted = make_model(genres, domestic)
-    #print results.summary()
-    #print results.params
     return genres, domestic, results, predicted
 
 def plot_domestic_genre(df, results):
     df_g = separate_genres(df)
-    #df1 = df.drop("3D")
     x= list(results.params.index)[2:] #no Intercept or 3D genre
     print x
-    #y = y[1:]
-    #print df1["DomLifeGross"]
     ax = plt.subplot(111)
     ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
@@ -288,8 +279,6 @@ def plot_domestic_budget(X, y):
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: '%.0f'%(x*1e-6)))
     sns.regplot(x=X["Budget"], y=y["DomLifeGross"], color=data_c, line_kws = {"color" : pred_c})
-    #plt.subplot(111)
-    #plt.plot(X["Budget"], predicted, color=pred_c, alpha=pred_al)
     plt.xlabel("Budget (millions)")
     plt.ylabel("Domestic Lifetime Gross (millions)")
     plt.show()
@@ -304,22 +293,16 @@ def plot_domestic_wreldate(df):
     sns.plt.ylabel("Domestic Lifetime Gross (millions)")
     sns.plt.xlabel("Country of Origin")
     plt.xticks(rotation=90)
-    #sns.plt.margins(0.2)
     sns.despine()
     sns.plt.show()
 
 def plot_domestic_origin(df, predicted=None):
-    #np.random.seed(sum(map(ord, "categorical")))
     ax = plt.subplot(111)
     ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
                                                    pos: ('%.0f')%(x*1e-6)))
-    #ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, pos: '%.0f'%x))
     sns.stripplot(x="DomLifeGross", y="OriginC", data=df)
     sns.plt.xlabel("Domestic Lifetime Gross (millions)")
     sns.plt.ylabel("Country of Origin")
-    #print "domestic origin"
-    #plt.xticks(rotation=90)
-    #sns.plt.margins(0.2)
     sns.despine()
     sns.plt.show()
 
@@ -511,8 +494,7 @@ def run_all(df):
     plot_domestic_wopenth(X, y, True)
         
     X, y, results, predicted = domestic_genre(df)
-    print "genre ^"
-    #X, y, results, predicted = domestic_foreign_wopenth(df)
+    X, y, results, predicted = domestic_foreign_wopenth(df)
     
     X, y, results, predicted = domestic_widestth(df)
     plot_domestic_widestth(X, y)
@@ -520,7 +502,7 @@ def run_all(df):
     plot_domestic_widestth(X, y, True)
 
     X, y, results, predicted = domestic_origin(df)
-    #plot_domestic_origin_pred(df, predicted) #this is bad/wrong(?)
+    plot_domestic_origin_pred(df, predicted) #this is bad/wrong(?)
     X, y, results, predicted = domestic_origin_foreign(df)
     print results.summary()
     plot_domestic_origin_bar(df)
@@ -530,17 +512,114 @@ def run_all(df):
     plot_domestic_budget(X, y)
     
     X, y, results, predicted = domestic_genre(df)
-    #plot_domestic_genre(df, results)
+    plot_domestic_genre(df, results)
     plot_by_genre_count(df)
     plot_by_genre_count(df, True)
     
-    
     country_list = ["INDIA", "FRANCE"]
-    #France, india
     for country in country_list:
         plot_genre_country_count(df, country)
         results = plot_domestic_genre_by_country(df, country)
     plot_domestic_genre_by_country(df)
+
+def run_challenges(df):
+    challenge_1(df)
+    challenge_2(df)
+    challenge_3(df)
+    challenge_4(df)
+
+def run_specifics(df, country):
+    X, y, results, predicted = domestic_foreign(df)
+    plt.title(country)
+    plot_domestic_foreign(X, y)
+    
+    X, y, results, predicted = domestic_wopenth(df)
+    plt.title(country)
+    plot_domestic_wopenth(X, y)
+    
+    #X,y, results, predicted = domestic_wopenth(df, True)
+    #plt.title(country)
+    #plot_domestic_wopenth(X, y, True)
+            
+    X, y, results, predicted = domestic_foreign_wopenth(df)
+    
+    X, y, results, predicted = domestic_widestth(df)
+    plt.title(country)
+    plot_domestic_widestth(X, y)
+    #X, y, results, predicted = domestic_widestth(df, True)
+    #plot_domestic_widestth(X, y, True)
+
+    #plot_by_genre_mean(df)
+    
+    X, y, results, predicted = domestic_genre(df)
+    #plot_domestic_genre(df, results)
+    #plot_by_genre_count(df)
+    #plot_by_genre_count(df, True)
+    
+def test_train(X, y, title="All Countries", xlab=None, ylab="Domestic (millions)", r_state=None, set_x=False, plot=True):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=r_state)
+    
+    smols = sm.OLS(y_train,X_train).fit()
+    smols_pred_y = smols.predict(X_test)
+
+    regr = linear_model.LinearRegression()
+    regr.fit(X_train, y_train)
+    resids = []
+    #residual = observed - predicted
+    resids =  [y_test[i] - regr.predict(x[1])[1] for i, x in enumerate(X_test)]
+    #for i, x_r in enumerate(X_test)
+    #    resids.append(y_test[i] - regr.predict(x_r[1])[1])
+    # The coefficients
+    print('Coefficients: \n', regr.coef_)
+    # The mean square error
+    print("Residual sum of squares: %.2f" % np.mean((regr.predict(X_test) - 
+                                                     y_test) ** 2))
+    # Explained variance score: 1 is perfect prediction
+    print('R Squared score: %.2f' % regr.score(X_test, y_test))
+
+    if plot:
+        plot_expected(X_test, y_test, regr, resids, title, xlab, ylab, set_x)
+
+def test_split(df, country="All Countries", r_state=None):
+    X, y, _, _ = domestic_foreign(df)
+    test_train(X, y, title=country, xlab="Foreign", set_x=True, r_state=r_state)
+
+    X, y, _, _ = domestic_wopenth(df)
+    test_train(X, y, title=country, xlab="Wide Open Theaters", r_state=r_state)
+
+    X, y, _, _ = domestic_widestth(df)
+    test_train(X, y, title=country, xlab="Widest Theaters", r_state=r_state)
+
+    X, y, _, _ = domestic_foreign_wopenth(df)
+    test_train(X, y, plot=False)
+
+def plot_expected(X_test, y_test, regr, resids, title="All Countries", 
+                  xlab=None, ylab="Domestic", set_x=False):
+    fig1 = plt.figure(1)
+    ax=fig1.add_axes((.1,.3,.8,.6))
+    X_list = map(lambda x: x[1], X_test)
+    ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.0f')%(x*1e-6)))
+    plt.scatter(X_list, y_test, color=data_c, alpha=data_al)
+    plt.plot(X_list, regr.predict(X_test), color=pred_c, alpha=pred_al)
+    plt.ylabel(ylab)
+    plt.title(title)
+    ax.set_xticklabels([]) #Remove x-tic labels for the first frame
+    plt.grid(b=True, which='major')
+
+    ax2=fig1.add_axes((.1,.1,.8,.2), sharex=ax)
+    ax2.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                   pos: ('%.1f')%(x*1e-6)))
+    plt.plot(X_list,resids,'ob')
+    if set_x:
+         ax2.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                    pos: ('%.0f')%(x*1e-6)))
+    else:
+        ax2.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                                        pos: ('%.0f')%x))
+    plt.grid(b=True, which='major')
+    plt.xlabel(xlab)
+    plt.show()
 
 #initial_dataframe()
 df = unpickle(PICKLEDIR + "df")
@@ -554,125 +633,67 @@ df = unpickle(PICKLEDIR + "df")
 
 #domestic_origin_wopenth_wreldate(df)
 
-#crunchbase.com, angel.co
-
-def run_challenges(df):
-    challenge_1(df)
-    challenge_2(df)
-    challenge_3(df)
-    challenge_4(df)
-
 #run_challenges(df)
 #run_all(df)
 #X, y, results, predicted = domestic_wopenth(df)
 #plot_domestic_wopenth(X, y)
-#plot_domestic_wopenth(X, y, True)
 #print "Dropping 'Crouching Tiger, Hidden Dragon'"
 #df_sad = df[df["DomLifeGross"] < 80000000]    
 #run_all(df_sad)
 
-#scikit learn crossvalidation train_test_split
-
-def run_specifics(df):
-    X, y, results, predicted = domestic_foreign(df)
-    #plot_domestic_foreign(X, y)
-    
-    X, y, results, predicted = domestic_wopenth(df)
-    #plot_domestic_wopenth(X, y)
-    
-    #X,y, results, predicted = domestic_wopenth(df, True)
-    #plot_domestic_wopenth(X, y, True)
-            
-    #X, y, results, predicted = domestic_foreign_wopenth(df)
-    
-    X, y, results, predicted = domestic_widestth(df)
-    #plot_domestic_widestth(X, y)
-    #X, y, results, predicted = domestic_widestth(df, True)
-    #plot_domestic_widestth(X, y, True)
-
-    #plot_by_genre_mean(df)
-
-    #X, y, results, predicted = domestic_budget(df)
-    #plot_domestic_budget(X, y)
-    
-    X, y, results, predicted = domestic_genre(df)
-    #plot_domestic_genre(df, results)
-    #plot_by_genre_count(df)
-    #plot_by_genre_count(df, True)
-    
-
-    
-def test_train(X, y, title="All Countries", xlab=None, ylab="Domestic", r_state=None, set_x=False):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=r_state)
-    
-    smols = sm.OLS(y_train,X_train).fit()
-    smols_pred_y = smols.predict(X_test)
-
-    regr = linear_model.LinearRegression()
-    regr.fit(X_train, y_train)
-    # The coefficients
-    print('Coefficients: \n', regr.coef_)
-    # The mean square error
-    print("Residual sum of squares: %.2f" % np.mean((regr.predict(X_test) - 
-                                                     y_test) ** 2))
-    # Explained variance score: 1 is perfect prediction
-    print('New Variance score: %.2f' % regr.score(X_test, y_test))
-
-    ax = plt.subplot(111)
-    X_list = map(lambda x: x[1], X_test)
-    ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
-                                                   pos: ('%.0f')%(x*1e-6)))
-    if set_x:
-         ax.xaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
-                                                   pos: ('%.0f')%(x*1e-6)))
-    plt.scatter(X_list, y_test, color=data_c, alpha=data_al)
-    plt.plot(X_list, regr.predict(X_test), color=pred_c, alpha=pred_al)
-    plt.xlabel(xlab)
-    plt.ylabel(ylab)
-    plt.title(title)
-    plt.show()
-
-def test_split(df, country="All Countries"):
-    X, y, _, _ = domestic_foreign(df)
-    test_train(X, y, title=country, xlab="Foreign", set_x=True)
-
-    X, y, _, _ = domestic_wopenth(df)
-    test_train(X, y, title=country, xlab="Wide Open Theaters")
-
-    X, y, _, _ = domestic_widestth(df)
-    test_train(X, y, title=country, xlab="Widest Theaters")
-
-    #X, y, _, _ = domestic_genre(df)
-    #test_train(X, y, title=country, xlab="Genre")
-
-
 countries = df["OriginC"].values
 counts = Counter(countries)
 countries = counts.most_common(COUNTRYLIM)
-#for c in countries:
-#    print c[0]
-#    dfC = df.loc[df["OriginC"] == c[0]]
-#    #run_specifics(dfC)
-#    test_split(dfC, c[0])
+countries = ["MEXICO"]
+#[('INDIA', 267), ('FRANCE', 150), ('CHINA', 48), ('ITALY', 31), ('SPAIN', 30), ('MEXICO', 29), ('GERMANY', 28), ('SOUTH KOREA', 26), ('JAPAN', 19), ('HONG KONG', 19)]
+
+for c in countries:
+    print c[0]
+    dfC = df.loc[df["OriginC"] == c]#[0]]
+    run_specifics(dfC, c)#[0])
+    test_split(dfC, c, r_state=2)#1,8,10 2is good for india, france
 #print countries
+countries_full = counts.most_common()
+countries_full.sort()
+print countries_full
+xs = []
+ys = []
+for c in countries_full:
+    xs.append(c[0])
+    ys.append(c[1])
+#sns.barplot(ys,xs, color=data_c, alpha=pred_al)
+#plt.xlabel("Number of Movies")
+#plt.ylabel("Country")
+#plt.show()
 
 print "Test Train for Action Genre"
+df_g = separate_genres(df)
 df_a = df_g[df_g["Action"] == 1]
-test_split(df_a)
+#test_split(df_a, r_state=11)
 
 print "Dropping 'Crouching Tiger, Hidden Dragon'"
 df_sad = df[df["DomLifeGross"] < 80000000]
 df_g = separate_genres(df_sad)
 df_a = df_g[df_g["Action"] == 1]
-test_split(df_a)
+
+ax = plt.subplot(111)
+ax.yaxis.set_major_formatter(tkr.FuncFormatter(lambda x, 
+                                               pos: ('%.0f')%(x*1e-6)))
+sns.regplot(x="WOpenTh", y="DomLifeGross", data=df_a, color=data_c, line_kws = {"color" : pred_c})
+plt.title("Action, no Crouching Tiger")
+plt.xlabel("Wide Opening Theaters")
+plt.ylabel("Domestic Lifetime Gross (millions)")
+sns.plt.show()
+
+test_split(df_a, r_state=2, country="Action")
 
 
-#cols = list(df_g)
-#genres = df_g.iloc[:,10:]
-#for g in genres:
-#counts = genres.sum()
-#Counter(df_g.iloc[:,10:].apply(lambda column: column.sum()))
+cols = list(df_g)
+genres = df_g.iloc[:,10:]
+counts = genres.sum()
+new_list = zip(list(genres), counts)
+genres_counts = sorted(new_list, reverse=True, key=lambda x: x[1])
+print genres_counts[:10]
+#[('Unknown', 709.0), ('Action', 58.0), ('Gay / Lesbian', 14.0), ('Horror', 14.0), ('War', 12.0), ('Cannes Film Festival', 9.0), ('Drama', 9.0), ('Documentary', 8.0), ('Thriller', 8.0), ('3D', 7.0)]
 
-#new_list = zip(list(genres), counts)
-#genres_counts = sorted(new_list, reverse=True, key=lambda x: x[1])
-#print df_a.head()
+# #movies/country hist/bar
