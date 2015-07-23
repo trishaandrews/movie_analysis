@@ -101,8 +101,7 @@ def get_foreign_titles():
     fulllocs = {}
     for i in range(PAGENUM):
         page_n = i+1
-        url = "http://www.boxofficemojo.com/genres/chart/?view=main&sort=
-        gross&order=DESC&pagenum=%d&id=foreign.htm" %page_n
+        url = "http://www.boxofficemojo.com/genres/chart/?view=main&sort=gross&order=DESC&pagenum=%d&id=foreign.htm" %page_n
         
         page = connection_process(url)
         soup = BeautifulSoup(page)
